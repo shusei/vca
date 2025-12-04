@@ -1,0 +1,32 @@
+{
+  "name": "公子姐",
+  "height_cm": 179.0,
+  "weight_kg": 67.0,
+  "gender_identity": "trans_female",
+  "gender_expression": "feminine",
+  "body_shape_notes": "腹部脂肪較多，有一點 O 型腿，目前有一點自然胸線，想保留胸部線條",
+  "measurements": {
+    "shoulder_width_cm": 39.0,
+    "bust_cm": 92.0,
+    "underbust_cm": 85.0,
+    "waist_cm": 84.0,
+    "abdomen_cm": 91.0,
+    "hip_cm": 95.0,
+    "thigh_circ_cm": 0,
+    "calf_circ_cm": 0,
+    "ankle_circ_cm": 0
+  },
+  "style_preferences": [
+    "溫柔",
+    "修長",
+    "淑女",
+    "略性感但不低俗"
+  ],
+  "style_avoid": [
+    "過度中性的寬鬆男裝風",
+    "童裝感太重的可愛風"
+  ],
+  "workplace_rules": "",
+  "climate_notes": "",
+  "body_photo_path": "d:\\Source\\Test\\vca\\images\\user_body.png"
+}
