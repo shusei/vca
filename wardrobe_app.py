@@ -234,57 +234,53 @@ def remove_bg_silent(img_path):
         print(f"Silent remove bg failed: {e}")
         return None
 
-def call_openai_api(prompt, image_path=None, api_key=None):
+def call_ai_api(prompt, image_path=None, api_key=None):
     """
-    呼叫 OpenAI API 進行分析。
+    呼叫 Google Gemini API 進行分析。
     """
-    # 這裡需要 openai 套件，若無則模擬回傳
-    try:
-        import openai
-        client = openai.OpenAI(api_key=api_key)
-        
-        messages = [
-            {"role": "system", "content": "You are a helpful assistant that outputs JSON only."},
-            {"role": "user", "content": prompt}
-        ]
-        
-        # 如果有圖片，需要轉成 base64 並加入 messages
-        if image_path:
-            import base64
-            with open(image_path, "rb") as image_file:
-                base64_image = base64.b64encode(image_file.read()).decode('utf-8')
-            
-            messages[1]["content"] = [
-                {"type": "text", "text": prompt},
-                {"type": "image_url", "image_url": {"url": f"data:image/jpeg;base64,{base64_image}"}}
-            ]
+    if not api_key:
+        print("API Key is missing.")
+        return None
 
-        response = client.chat.completions.create(
-            model="gpt-4o",
-            messages=messages,
-            response_format={"type": "json_object"}
+    try:
+        import google.generativeai as genai
+        
+        genai.configure(api_key=api_key)
+        
+        # 使用 gemini-flash-latest 模型
+        model = genai.GenerativeModel('gemini-1.5-flash-latest')
+        
+        content = [prompt]
+        
+        if image_path:
+            if not HAS_PIL:
+                print("PIL not installed, cannot process image for Gemini.")
+                return None
+            
+            try:
+                img = Image.open(image_path)
+                content.append(img)
+            except Exception as e:
+                print(f"Error opening image for Gemini: {e}")
+                return None
+
+        # 設定 generation config 以確保回傳 JSON
+        generation_config = genai.types.GenerationConfig(
+            response_mime_type="application/json"
         )
-        return response.choices[0].message.content
+
+        response = model.generate_content(
+            content,
+            generation_config=generation_config
+        )
+        
+        return response.text
         
     except ImportError:
-        # 模擬回傳 (Mock)
-        print("OpenAI module not found. Using mock response.")
-        return json.dumps({
-            "ok": True,
-            "message": "Mock Analysis",
-            "data": {
-                "type": "T-Shirt",
-                "color": "White",
-                "styleTags": ["Casual", "Simple"],
-                "seasons": ["Summer"],
-                "occasions": ["Daily"],
-                "lengthDesc": "Normal",
-                "bodyEffect": "Neutral",
-                "notes": "Mock data for batch import."
-            }
-        })
+        print("google-generativeai module not found.")
+        return None
     except Exception as e:
-        print(f"OpenAI API Error: {e}")
+        print(f"Gemini API Error: {e}")
         return None
 
 
@@ -426,15 +422,39 @@ class WardrobeManager:
             return []
         try:
             with open(self.filepath, 'r', encoding='utf-8') as f:
-                return json.load(f)
+                data = json.load(f)
+                if not isinstance(data, list):
+                    print(f"Warning: {self.filepath} content is not a list. Returning empty.")
+                    return []
+                return data
+        except json.JSONDecodeError:
+            print(f"Error: {self.filepath} is corrupted (JSON decode error). Returning empty list but NOT overwriting yet.")
+            return []
         except Exception as e:
             sg.popup_error(f"讀取衣櫃資料失敗: {e}")
             return []
 
     def save(self):
         try:
-            with open(self.filepath, 'w', encoding='utf-8') as f:
+            # Create a backup first
+            if os.path.exists(self.filepath):
+                backup_path = f"{self.filepath}.bak"
+                try:
+                    import shutil
+                    shutil.copy2(self.filepath, backup_path)
+                except Exception as e:
+                    print(f"Warning: Failed to create backup: {e}")
+
+            # Write to a temp file first
+            temp_path = f"{self.filepath}.tmp"
+            with open(temp_path, 'w', encoding='utf-8') as f:
                 json.dump(self.items, f, ensure_ascii=False, indent=2)
+            
+            # Atomic rename (replace)
+            if os.path.exists(self.filepath):
+                os.remove(self.filepath)
+            os.rename(temp_path, self.filepath)
+            
             return True
         except Exception as e:
             sg.popup_error(f"儲存衣櫃資料失敗: {e}")
@@ -1138,7 +1158,7 @@ def process_batch_import(folder_path, wardrobe_mgr, profile_mgr, progress_window
         prompt = build_add_item_prompt(profile_mgr.data, item_info)
         
         # 呼叫 API (若無 key 則用 Mock)
-        json_resp = call_openai_api(prompt, final_img_path, api_key)
+        json_resp = call_ai_api(prompt, final_img_path, api_key)
         
         if json_resp:
             parsed = extract_json(json_resp)
